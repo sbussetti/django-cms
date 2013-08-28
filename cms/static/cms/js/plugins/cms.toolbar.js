@@ -608,7 +608,11 @@ $(document).ready(function () {
 
 		_enableEditMode: function (speed, init) {
 			this.bars.hide();
-			this.plugins.stop(true, true).fadeIn(speed);
+			// don't fiddle with the display if the plugin would
+			// like to manage that itself.
+			this.plugins.stop(true, true)
+						.filter(':not(.cms_plugin_edit_display-managed)')
+						.fadeIn(speed);
 			this.placeholders.hide();
 
 			// set active item
