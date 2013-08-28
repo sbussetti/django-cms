@@ -613,6 +613,8 @@ $(document).ready(function () {
 			this.plugins.stop(true, true)
 						.filter(':not(.cms_plugin_edit_display-managed)')
 						.fadeIn(speed);
+			this.plugins.filter('.cms_plugin_edit_display-managed').css('display', '');
+
 			this.placeholders.hide();
 
 			// set active item
