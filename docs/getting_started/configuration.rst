@@ -77,6 +77,12 @@ Example::
             'extra_context': {"width":640},
             'name': gettext("Content"),
             'language_fallback': True,
+            'child_classes': {
+                'TextPlugin': ['PicturePlugin', 'LinkPlugin'],
+            },
+            'parent_classes': {
+                'LinkPlugin': ['TextPlugin', 'StackPlugin'],
+            }
         },
         'right-column': {
             "plugins": ['TeaserPlugin', 'LinkPlugin'],
@@ -135,6 +141,14 @@ plugins, as shown above with ``base.html content``.
 
 ``plugin_labes``
     A dictionary of plugins and custom labels to show in the toolbar UI.
+
+``child_classes``
+    A dictionary of plugin names with lists describing which plugins may be
+    placed inside each plugin. If not supplied, all plugins can be selected.
+
+``parent_classes``
+    A dictionary of plugin names with lists describing which plugins may contain
+    each plugin. If not supplied, all plugins can be selected.
 
 
 .. setting:: CMS_PLUGIN_CONTEXT_PROCESSORS
@@ -260,6 +274,12 @@ Example::
     }
 
 .. note:: Make sure you only define languages which are also in :setting:`django:LANGUAGES`.
+
+.. warning::
+
+    Make sure you use **language codes** (`en-us`) and not **locale names**
+    (`en_US`) here and in :setting:`django:LANGUAGES`.
+    Use :ref:`check command <cms-check-command>` to check for correct syntax.
 
 ``CMS_LANGUAGES`` has different options where you can define how different
 languages behave, with granular control.
