@@ -1275,9 +1275,9 @@ $(document).ready(function () {
 
 			var scrollTop = $(window).scrollTop();
 			if(disable) {
-				this.body.addClass('cms_toolbar-noscroll').css('top',-scrollTop).data('scroll', scrollTop);
+				this.body.data({'top': this.body.css('top'), 'scroll': scrollTop}).addClass('cms_toolbar-noscroll').css('top',-scrollTop);
 			} else {
-				this.body.css('top', scrollTop).removeClass('cms_toolbar-noscroll');
+				this.body.css('top', this.body.data('top')).removeClass('cms_toolbar-noscroll');
 				$(window).scrollTop(this.body.data('scroll'));
 			}
 		},
