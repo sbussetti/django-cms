@@ -1271,17 +1271,15 @@ $(document).ready(function () {
 
 		_disableScroll: function (disable) {
 			// cancel if scrollbar is not visible
-			/* SB: this introduces a UI breaking regression
 			if($(document).height() <= $(window).height()) return false;
 
 			var scrollTop = $(window).scrollTop();
 			if(disable) {
 				this.body.addClass('cms_toolbar-noscroll').css('top',-scrollTop).data('scroll', scrollTop);
 			} else {
-				this.body.removeClass('cms_toolbar-noscroll');
+				this.body.css('top', scrollTop).removeClass('cms_toolbar-noscroll');
 				$(window).scrollTop(this.body.data('scroll'));
 			}
-			*/
 		},
 
 		_lockToolbar: function (lock) {
