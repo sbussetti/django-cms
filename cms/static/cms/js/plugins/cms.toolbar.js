@@ -1267,13 +1267,16 @@ $(document).ready(function () {
 			// cancel if scrollbar is not visible
 			if($(document).height() <= $(window).height()) return false;
 
-			var scrollTop = $(window).scrollTop();
-			if(disable) {
-				this.body.addClass('cms_toolbar-noscroll').css('top',-scrollTop).data('scroll', scrollTop);
-			} else {
-				this.body.removeClass('cms_toolbar-noscroll');
-				$(window).scrollTop(this.body.data('scroll'));
-			}
+            var scrollTop = $(window).scrollTop();
+            if(disable) {
+                this.body.data({'top': this.body.css('top'), 'scroll': scrollTop})
+						 .addClass('cms_toolbar-noscroll')
+						 .css('top',-scrollTop);
+            } else {
+                this.body.css('top', this.body.data('top'))
+						 .removeClass('cms_toolbar-noscroll');
+                $(window).scrollTop(this.body.data('scroll'));
+            }
 		},
 
 		_lockToolbar: function (lock) {
