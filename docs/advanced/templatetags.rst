@@ -64,7 +64,52 @@ See also the :setting:`CMS_PLACEHOLDER_CONF` setting where you can also add extr
 context variables and change some other placeholder behavior.
 
 
+static_placeholder
+==================
+
+The static_placeholder templatetag can be used anywhere in any template and is not bound to any page or model.
+It needs a name and it will create a placeholder that you can fill with plugins afterwards.
+The static_placeholder tag is normally used to display the same content on
+multiple locations or inside of apphooks or other 3rd party apps. Static_placeholder need to be published
+to show up on live pages.
+
+Example::
+
+    {% load cms_tags %}
+
+    {% static_placeholder "footer" %}
+
+
+.. warning::
+
+    Static_placeholders are not included in the undo/redo and page history pages
+
+
 .. templatetag:: show_placeholder
+
+render_placeholder
+==================
+
+`{% render_placeholder %}` is used if you have a PlaceholderField in your own model and want
+to render it in the template.
+
+The :ttag:`render_placeholder` tag takes the following parameters:
+
+* :class:`~cms.models.fields.PlaceholderField` instance
+* ``width`` parameter for context sensitive plugins (optional)
+* ``language`` keyword plus ``language-code`` string to render content in the
+  specified language (optional)
+
+
+The following example renders the my_placeholder field from the mymodel_instance and will render
+only the english plugins:
+
+.. code-block:: html+django
+
+    {% load cms_tags %}
+
+    {% render_placeholder mymodel_instance.my_placeholder language 'en' %}
+
 
 
 show_placeholder
@@ -246,39 +291,50 @@ Example::
 Normally the children of plugins can be accessed via the ``child_plugins`` attribute of plugins.
 Plugins need the ``allow_children`` attribute to set to `True` for this to be enabled.
 
-.. templatetag:: show_editable_page_title
+.. templatetag:: show_editable_model
 .. versionadded:: 3.0
 
-show_editable_page_title
-========================
+show_editable_model
+===================
 
-This templatetags enables editing the page title from the frontend.
-If in edit mode you can double click on the title and modify in an overlay window; if in live mode
-it fallbacks to ``page_attribute title``.
+``show_editable_model`` works by showing the content of the given attribute in
+the model instance and eventually makes it clickable to edit the related model.
 
-Example::
+If the toolbar is not enabled, the value of the attribute is rendered in the
+template without further action.
 
-	{% load cms_tags %}
+If the toolbar is enabled, frontend code is added to make the attribute value
+clickable.
 
-	{% show_editable_page_title %}
+Using this templatetag you can show and edit page titles as well as fields in
+standard django models, see :ref:`frontend-editable-fields` for examples and
+further documentation.
 
-******************
-Stack Templatetags
-******************
+Arguments:
 
-stack
-=====
+* ``instance``: instance of your model in the template
+* ``attribute``: the name of the attribute you want to show in the template; it
+  can be a context variable name; it's possible to target field, property or
+  callable for the specified model;
+* ``edit_fields`` (optional): a comma separated list of fields editable in the
+  popup editor;
+* ``language`` (optional): the admin language tab to be linked. Useful only for
+  `django-hvad`_ enabled models.
+* ``filters`` (optional): a string containing chained filters to apply to the
+  output content; works the same way as :ttag:`django:filter` templatetag;
+* ``view_url`` (optional): the name of a url that will be reversed using the
+  instance ``pk`` and the ``language`` as arguments;
+* ``view_method`` (optional): a method name that will return a URL to a view;
+  the method must accept ``request`` as first parameter.
 
-The stack templatetag can be used anywhere in any template. It needs a name and it will create a placeholder
-that you can fill with plugins afterwards. The stack tag is normally used to display the same content on
-multiple locations.
 
+.. warning::
 
-Example::
+    ``show_editable_model`` marks as safe the content of the rendered model
+    attribute. This may be a security risk if used on fields which may hold
+    non-trusted content. Be aware, and use the templatetag accordingly.
 
-    {% load stack_tags %}
-
-    {% stack "footer" %}
+.. _django-hvad: https://github.com/kristianoellegaard/django-hvad
 
 
 *****************
@@ -508,4 +564,11 @@ Example::
     {% cms_toolbar %}
     {% placeholder "home" %}
     ...
+
+
+.. note::
+
+    Be aware that you can not surround the cms_toolbar tag with block tags.
+    The toolbar tag will render everything below it to collect all plugins and placeholders, before
+    it renders itself. Block tags interfere with this.
 

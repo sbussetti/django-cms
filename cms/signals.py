@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
+from cms.exceptions import NoHomeFound
 from cms.utils.conf import get_cms_setting
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import signals
 from django.dispatch import Signal
 
 from cms.cache.permissions import clear_user_permission_cache, clear_permission_cache
-from cms.models import Page, Title, CMSPlugin, PagePermission, GlobalPagePermission, PageUser, PageUserGroup
+from cms.models import Page, Title, CMSPlugin, PagePermission, GlobalPagePermission, PageUser, PageUserGroup, PlaceholderReference, Placeholder
 from django.conf import settings
 from menus.menu_pool import menu_pool
 
@@ -18,11 +19,12 @@ application_post_changed = Signal(providing_args=["instance"])
 # fired after page gets published - copied to public model - there may be more
 # than one instances published before this signal gets called
 post_publish = Signal(providing_args=["instance"])
+post_unpublish = Signal(providing_args=["instance"])
 
 
 def update_plugin_positions(**kwargs):
     plugin = kwargs['instance']
-    plugins = CMSPlugin.objects.filter(language=plugin.language, placeholder=plugin.placeholder).order_by("position")
+    plugins = CMSPlugin.objects.filter(language=plugin.language, placeholder=plugin.placeholder_id).order_by("position")
     last = 0
     for p in plugins:
         if p.position != last:
@@ -32,6 +34,51 @@ def update_plugin_positions(**kwargs):
 
 
 signals.post_delete.connect(update_plugin_positions, sender=CMSPlugin, dispatch_uid="cms.plugin.update_position")
+
+
+def update_home(instance, **kwargs):
+    """
+    Updates the is_home flag of page instances after they are saved or moved.
+
+    :param instance: Page instance
+    :param kwargs:
+    :return:
+    """
+    if getattr(instance, '_home_checked', False):
+        return
+    if not instance.parent_id or (getattr(instance, 'old_page', False) and not instance.old_page.parent_id):
+        if instance.publisher_is_draft:
+            qs = Page.objects.drafts()
+        else:
+            qs = Page.objects.public()
+        try:
+            home_pk = qs.filter(published=True).get_home(instance.site).pk
+        except NoHomeFound:
+            if instance.publisher_is_draft and not instance.published:
+                return
+            home_pk = instance.pk
+            instance.is_home = True
+        for page in qs.filter(site=instance.site, is_home=True).exclude(pk=home_pk):
+            if instance.pk == page.pk:
+                instance.is_home = False
+            page.is_home = False
+            page._publisher_keep_state = True
+            page._home_checked = True
+            page.save()
+        try:
+            page = qs.get(pk=home_pk, site=instance.site)
+        except Page.DoesNotExist:
+            return
+        page.is_home = True
+        if instance.pk == home_pk:
+            instance.is_home = True
+        page._publisher_keep_state = True
+        page._home_checked = True
+        page.save()
+
+
+page_moved.connect(update_home, sender=Page, dispatch_uid="cms.page.update_home")
+signals.post_delete.connect(update_home, sender=Page)
 
 
 def update_title_paths(instance, **kwargs):
@@ -46,13 +93,11 @@ page_moved.connect(update_title_paths, sender=Page, dispatch_uid="cms.title.upda
 
 def update_title(title):
     slug = u'%s' % title.slug
-
-    if title.page.is_home():
+    if title.page.is_home:
         title.path = ''
     elif not title.has_url_overwrite:
         title.path = u'%s' % slug
         parent_page_id = title.page.parent_id
-
         if parent_page_id:
             parent_title = Title.objects.get_title(parent_page_id,
                                                    language=title.language, language_fallback=True)
@@ -99,7 +144,7 @@ def post_save_title(instance, raw, created, **kwargs):
             descendant_title.path = ''  # just reset path
             descendant_title.tmp_prevent_descendant_update = True
             descendant_title.save()
-        # remove temporary attributes
+            # remove temporary attributes
     if hasattr(instance, 'tmp_path'):
         del instance.tmp_path
     if prevent_descendants:
@@ -176,9 +221,10 @@ def post_save_page_moderator(instance, raw, created, **kwargs):
 
 
 def post_save_page(instance, **kwargs):
-    if instance.old_page is None or instance.old_page.parent_id != instance.parent_id:
+    update_home(instance)
+    if instance.old_page is None or instance.old_page.parent_id != instance.parent_id or instance.is_home != instance.old_page.is_home:
         for page in instance.get_descendants(include_self=True):
-            for title in page.title_set.all():
+            for title in page.title_set.all().select_related('page'):
                 update_title(title)
                 title.save()
     if instance.old_page is None or instance.old_page.application_urls != instance.application_urls:
@@ -200,6 +246,18 @@ signals.post_save.connect(post_save_page, sender=Page)
 signals.post_save.connect(update_placeholders, sender=Page)
 signals.pre_save.connect(invalidate_menu_cache, sender=Page)
 signals.pre_delete.connect(invalidate_menu_cache, sender=Page)
+
+
+def clear_placeholder_ref(instance, **kwargs):
+    instance.placeholder_ref_id_later = instance.placeholder_ref_id
+
+signals.pre_delete.connect(clear_placeholder_ref, sender=PlaceholderReference)
+
+
+def clear_placeholder_ref_placeholder(instance, **kwargs):
+    Placeholder.objects.filter(pk=instance.placeholder_ref_id_later).delete()
+
+signals.post_delete.connect(clear_placeholder_ref_placeholder, sender=PlaceholderReference)
 
 
 def pre_save_user(instance, raw, **kwargs):

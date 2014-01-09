@@ -1,22 +1,23 @@
 # -*- coding: utf-8 -*-
 from datetime import timedelta
-
+from os.path import join
 from cms import constants
 from cms.constants import TEMPLATE_INHERITANCE_MAGIC
-from cms.utils.compat.metaclasses import with_metaclass
-from cms.utils.conf import get_cms_setting
-from django.core.exceptions import PermissionDenied
-from cms.exceptions import NoHomeFound, PublicIsUnmodifiable
+from cms.exceptions import PublicIsUnmodifiable
 from cms.models.managers import PageManager, PagePermissionsPermissionManager
 from cms.models.metaclasses import PageMetaClass
 from cms.models.placeholdermodel import Placeholder
 from cms.models.pluginmodel import CMSPlugin
 from cms.publisher.errors import MpttPublisherCantPublish
 from cms.utils import i18n, page as page_utils
+from cms.utils.compat import DJANGO_1_5
+from cms.utils.compat.dj import force_unicode, python_2_unicode_compatible
+from cms.utils.compat.metaclasses import with_metaclass
+from cms.utils.conf import get_cms_setting
 from cms.utils.copy_plugins import copy_plugins_to
 from cms.utils.helpers import reversion_register
-from cms.utils.compat.dj import force_unicode, python_2_unicode_compatible
 from django.contrib.sites.models import Site
+from django.core.exceptions import PermissionDenied
 from django.core.urlresolvers import reverse
 from django.db import models
 from django.db.models import Q
@@ -25,7 +26,6 @@ from django.utils import timezone
 from django.utils.translation import get_language, ugettext_lazy as _
 from menus.menu_pool import menu_pool
 from mptt.models import MPTTModel
-from os.path import join
 
 
 @python_2_unicode_compatible
@@ -62,17 +62,18 @@ class Page(with_metaclass(PageMetaClass, MPTTModel)):
     reverse_id = models.CharField(_("id"), max_length=40, db_index=True, blank=True, null=True, help_text=_(
         "An unique identifier that is used with the page_url templatetag for linking to this page"))
     navigation_extenders = models.CharField(_("attached menu"), max_length=80, db_index=True, blank=True, null=True)
-    published = models.BooleanField(_("is published"), blank=True)
+    published = models.BooleanField(_("is published"), blank=True, default=False)
 
     template = models.CharField(_("template"), max_length=100, choices=template_choices,
                                 help_text=_('The template used to render the content.'),
                                 default=TEMPLATE_INHERITANCE_MAGIC)
-    site = models.ForeignKey(Site, help_text=_('The site the page is accessible at.'), verbose_name=_("site"))
+    site = models.ForeignKey(Site, help_text=_('The site the page is accessible at.'), verbose_name=_("site"), related_name='djangocms_pages')
 
     login_required = models.BooleanField(_("login required"), default=False)
     limit_visibility_in_menu = models.SmallIntegerField(_("menu visibility"), default=None, null=True, blank=True,
                                                         choices=LIMIT_VISIBILITY_IN_MENU_CHOICES, db_index=True,
                                                         help_text=_("limit when this page is visible in the menu"))
+    is_home = models.BooleanField(editable=False, db_index=True, default=False)
     application_urls = models.CharField(_('application'), max_length=200, blank=True, null=True, db_index=True)
     application_namespace = models.CharField(_('application namespace'), max_length=200, blank=True, null=True)
     level = models.PositiveIntegerField(db_index=True, editable=False)
@@ -126,7 +127,7 @@ class Page(with_metaclass(PageMetaClass, MPTTModel)):
         return self.publisher_state == self.PUBLISHER_STATE_DIRTY
 
     def get_absolute_url(self, language=None, fallback=True):
-        if self.is_home():
+        if self.is_home:
             return reverse('pages-root')
         path = self.get_path(language, fallback) or self.get_slug(language, fallback)
         return reverse('pages-details-by-slug', kwargs={"slug": path})
@@ -372,7 +373,10 @@ class Page(with_metaclass(PageMetaClass, MPTTModel)):
 
         if commit:
             if no_signals:  # ugly hack because of mptt
-                self.save_base(cls=self.__class__, **kwargs)
+                if DJANGO_1_5:
+                    self.save_base(cls=self.__class__, **kwargs)
+                else:
+                    self.save_base(**kwargs)
             else:
                 super(Page, self).save(**kwargs)
 
@@ -391,6 +395,8 @@ class Page(with_metaclass(PageMetaClass, MPTTModel)):
         if keep_state:
             delattr(self, '_publisher_keep_state')
 
+        if not DJANGO_1_5 and 'cls' in kwargs:
+            del(kwargs['cls'])
         ret = super(Page, self).save_base(*args, **kwargs)
         return ret
 
@@ -409,8 +415,6 @@ class Page(with_metaclass(PageMetaClass, MPTTModel)):
 
         if not self.pk:
             self.save()
-        if not self.parent_id:
-            self.clear_home_pk_cache()
         if self._publisher_can_publish():
             if self.publisher_public_id:
                 # Ensure we have up to date mptt properties
@@ -459,7 +463,7 @@ class Page(with_metaclass(PageMetaClass, MPTTModel)):
         self.save()
         # If we are publishing, this page might have become a "home" which
         # would change the path
-        if self.is_home():
+        if self.is_home:
             for title in self.title_set.all():
                 if title.path != '':
                     title.save()
@@ -522,7 +526,9 @@ class Page(with_metaclass(PageMetaClass, MPTTModel)):
                     draft.publisher_state = Page.PUBLISHER_STATE_PENDING
                     draft._publisher_keep_state = True
                     draft.save()
-
+        from cms.signals import post_unpublish
+        post_unpublish.send(sender=Page, instance=self)
+        #post_unpublish.send(sender=Page, instance=public_page)
         return True
 
     def revert(self):
@@ -895,32 +901,6 @@ class Page(with_metaclass(PageMetaClass, MPTTModel)):
                 self.permission_edit_cache = True
         return getattr(self, att_name)
 
-    def is_home(self):
-        if self.parent_id:
-            return False
-        else:
-            try:
-                return self.home_pk_cache == self.pk
-            except NoHomeFound:
-                pass
-        return False
-
-    def get_home_pk_cache(self):
-        attr = "%s_home_pk_cache_%s" % (self.publisher_is_draft and "draft" or "public", self.site_id)
-        if getattr(self, attr, None) is None:
-            setattr(self, attr, self.get_object_queryset().get_home(self.site).pk)
-        return getattr(self, attr)
-
-    def set_home_pk_cache(self, value):
-
-        attr = "%s_home_pk_cache_%s" % (self.publisher_is_draft and "draft" or "public", self.site_id)
-        setattr(self, attr, value)
-
-    home_pk_cache = property(get_home_pk_cache, set_home_pk_cache)
-
-    def clear_home_pk_cache(self):
-        self.home_pk_cache = None
-
     def get_media_path(self, filename):
         """
         Returns path (relative to MEDIA_ROOT/MEDIA_URL) to directory for storing page-scope files.
@@ -943,20 +923,6 @@ class Page(with_metaclass(PageMetaClass, MPTTModel)):
             result = list(self.pagemoderatorstate_set.all().order_by('created'))
             self._moderator_state_cache = result
         return result[:5]
-
-    def delete_requested(self):
-        """ Checks whether there are any delete requests for this page.
-        Uses the same cache as last_page_states to minimize DB requests
-        """
-        from cms.models import PageModeratorState
-
-        result = getattr(self, '_moderator_state_cache', None)
-        if result is None:
-            return self.pagemoderatorstate_set.get_delete_actions().exists()
-        for state in result:
-            if state.action == PageModeratorState.ACTION_DELETE:
-                return True
-        return False
 
     def is_public_published(self):
         """Returns true if public model is published.

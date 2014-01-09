@@ -1,23 +1,25 @@
 # -*- coding: utf-8 -*-
 from datetime import date
-from cms.utils.compat.metaclasses import with_metaclass
-
-from django.core.urlresolvers import reverse, NoReverseMatch
-from django.utils.safestring import mark_safe
 import os
 import warnings
+import json
+
+from cms.exceptions import DontUsePageAttributeWarning
+from cms.models.placeholdermodel import Placeholder
+from cms.plugin_rendering import PluginContext, render_plugin
+from cms.utils import get_cms_setting
+from cms.utils.compat import DJANGO_1_5
+from cms.utils.compat.dj import force_unicode, python_2_unicode_compatible
+from cms.utils.compat.metaclasses import with_metaclass
+from cms.utils.helpers import reversion_register
+from django.core.urlresolvers import reverse, NoReverseMatch
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.db import models
 from django.db.models.base import model_unpickle
 from django.db.models.query_utils import DeferredAttribute
-from django.utils import timezone, simplejson
+from django.utils import timezone
+from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext_lazy as _
-from cms.exceptions import DontUsePageAttributeWarning
-from cms.models.placeholdermodel import Placeholder
-from cms.plugin_rendering import PluginContext, render_plugin
-from cms.utils.helpers import reversion_register
-from cms.utils.compat.dj import force_unicode, python_2_unicode_compatible
-from cms.utils import get_cms_setting
 from mptt.models import MPTTModel, MPTTModelBase
 
 
@@ -173,7 +175,9 @@ class CMSPlugin(with_metaclass(PluginModelBase, MPTTModel)):
         return self._inst, plugin
 
     def render_plugin(self, context=None, placeholder=None, admin=False, processors=None):
+
         instance, plugin = self.get_plugin_instance()
+
         if instance and not (admin and not plugin.admin_preview):
             if not isinstance(placeholder, Placeholder):
                 placeholder = instance.placeholder
@@ -193,6 +197,13 @@ class CMSPlugin(with_metaclass(PluginModelBase, MPTTModel)):
             else:
                 template = None
             return render_plugin(context, instance, placeholder, template, processors, context.current_app)
+        else:
+            from cms.middleware.toolbar import toolbar_plugin_processor
+            if processors and toolbar_plugin_processor in processors:
+                current_app = context.current_app if context else None
+                context = PluginContext(context, self, placeholder, current_app=current_app)
+                template = None
+                return render_plugin(context, self, placeholder, template, processors, context.current_app)
         return ""
 
     def get_media_path(self, filename):
@@ -234,7 +245,10 @@ class CMSPlugin(with_metaclass(PluginModelBase, MPTTModel)):
 
     def save(self, no_signals=False, *args, **kwargs):
         if no_signals:  # ugly hack because of mptt
-            super(CMSPlugin, self).save_base(cls=self.__class__)
+            if DJANGO_1_5:
+                super(CMSPlugin, self).save_base(cls=self.__class__)
+            else:
+                super(CMSPlugin, self).save_base()
         else:
             super(CMSPlugin, self).save()
 
@@ -300,25 +314,6 @@ class CMSPlugin(with_metaclass(PluginModelBase, MPTTModel)):
         """
         pass
 
-    def delete_with_public(self):
-        """
-            Delete the public copy of this plugin if it exists,
-            then delete the draft
-        """
-        position = self.position
-        slot = self.placeholder.slot
-        page = self.placeholder.page
-        if page and getattr(page, 'publisher_public'):
-            try:
-                placeholder = Placeholder.objects.get(page=page.publisher_public, slot=slot)
-            except Placeholder.DoesNotExist:
-                pass
-            else:
-                public_plugin = CMSPlugin.objects.filter(placeholder=placeholder, position=position)
-                public_plugin.delete()
-        self.placeholder = None
-        self.delete()
-
     def has_change_permission(self, request):
         page = self.placeholder.page if self.placeholder else None
         if page:
@@ -377,7 +372,7 @@ class CMSPlugin(with_metaclass(PluginModelBase, MPTTModel)):
         return breadcrumb
 
     def get_breadcrumb_json(self):
-        result = simplejson.dumps(self.get_breadcrumb())
+        result = json.dumps(self.get_breadcrumb())
         result = mark_safe(result)
         return result
 

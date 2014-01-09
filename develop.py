@@ -28,6 +28,7 @@ Usage:
     develop.py server [--port=<port>] [--bind=<bind>] [--migrate]
     develop.py shell
     develop.py compilemessages
+    develop.py makemessages
 
 Options:
     -h --help                   Show this screen.
@@ -142,7 +143,7 @@ def compilemessages():
 def makemessages():
     from django.core.management import call_command
     os.chdir('cms')
-    call_command('makemessages', all=True)
+    call_command('makemessages', locale='en')
 
 def shell():
     from django.core.management import call_command

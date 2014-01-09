@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 from cms.utils.compat.dj import python_2_unicode_compatible
 from cms.utils.helpers import reversion_register
-from cms.utils.placeholder import PlaceholderNoAction
+from cms.utils.placeholder import PlaceholderNoAction, get_placeholder_conf
 from django.core.urlresolvers import reverse
 from django.db import models
 from django.forms.widgets import Media
-from django.utils.translation import ugettext_lazy as _
+from django.template.defaultfilters import title
+from django.utils.translation import ugettext_lazy as _, get_language
 import operator
 
 
@@ -20,26 +21,43 @@ class Placeholder(models.Model):
     def __str__(self):
         return self.slot
 
+    def get_label(self):
+        name = get_placeholder_conf("name", self.slot, default=title(self.slot))
+        name = _(name)
+        return name
+
     def get_add_url(self):
         return self._get_url('add_plugin')
+
+    def get_edit_url(self, plugin_pk):
+        return self._get_url('edit_plugin', plugin_pk)
 
     def get_move_url(self):
         return self._get_url('move_plugin')
 
-    def get_remove_url(self):
-        return self._get_url('remove_plugin')
+    def get_delete_url(self, plugin_pk):
+        return self._get_url('delete_plugin', plugin_pk)
 
     def get_changelist_url(self):
         return self._get_url('changelist')
 
-    def _get_url(self, key):
+    def get_clear_url(self):
+        return self._get_url('clear_placeholder', self.pk)
+
+    def get_copy_url(self):
+        return self._get_url('copy_plugins')
+
+    def _get_url(self, key, pk=None):
         model = self._get_attached_model()
+        args = []
+        if pk:
+            args.append(pk)
         if not model:
-            return reverse('admin:cms_page_%s' % key)
+            return reverse('admin:cms_page_%s' % key, args=args)
         else:
             app_label = model._meta.app_label
             model_name = model.__name__.lower()
-            return reverse('admin:%s_%s_%s' % (app_label, model_name, key))
+            return reverse('admin:%s_%s_%s' % (app_label, model_name, key), args=args)
 
     def _get_permission(self, request, key):
         """
@@ -156,6 +174,9 @@ class Placeholder(models.Model):
 
     def get_plugins(self):
         return self.cmsplugin_set.all().order_by('tree_id', 'lft')
+
+    def get_cached_plugins(self):
+        return getattr(self, '_plugins_cache', [])
 
     @property
     def actions(self):
