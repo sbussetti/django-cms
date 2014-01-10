@@ -38,11 +38,34 @@ COPY_PAGE_LANGUAGE_BREAK = "Copy page language Break"
 @toolbar_pool.register
 class PlaceholderToolbar(CMSToolbar):
     """
-    Adds placeholder edit buttons if placeholders or stacks are detected in the template
+    Adds placeholder edit buttons if placeholders or static placeholders are detected in the template
 
     """
 
     def populate(self):
+        self.page = get_page_draft(self.request.current_page)
+        statics = getattr(self.request, 'static_placeholders', [])
+        placeholders = getattr(self.request, 'placeholders', [])
+        if self.page:
+            if self.page.has_change_permission(self.request):
+                self.add_structure_mode()
+            elif statics:
+                for static_placeholder in statics:
+                    if static_placeholder.has_change_permission(self.request):
+                        self.add_structure_mode()
+                        break
+        else:
+            added = False
+            if statics:
+                for static_placeholder in statics:
+                    if static_placeholder.has_change_permission(self.request):
+                        self.add_structure_mode()
+                        added = True
+                        break
+            if not added and placeholders:
+                self.add_structure_mode()
+
+    def add_structure_mode(self):
         switcher = self.toolbar.add_button_list('Mode Switcher', side=self.toolbar.RIGHT,
                                                 extra_classes=['cms_toolbar-item-cms-mode-switcher'])
         switcher.add_button(_("Content"), '?edit', active=not self.toolbar.build_mode,
@@ -78,8 +101,8 @@ class BasicToolbar(CMSToolbar):
             for site in sites_queryset:
                 sites_menu.add_link_item(site.name, url='http://%s' % site.domain,
                                          active=site.pk == self.current_site.pk)
-        # stacks
-        admin_menu.add_sideframe_item(_('Stacks'), url=reverse('admin:stacks_stack_changelist'))
+        # static placeholders
+        admin_menu.add_sideframe_item(_('Static Placeholders'), url=reverse('admin:cms_staticplaceholder_changelist'))
         # admin
         admin_menu.add_sideframe_item(_('Administration'), url=reverse('admin:index'))
         admin_menu.add_break(ADMINISTRATION_BREAK)
@@ -118,23 +141,59 @@ class PageToolbar(CMSToolbar):
             self.change_admin_menu()
             if self.page:
                 self.add_page_menu()
-
-                if self.toolbar.edit_mode:
-                    # history menu
+        statics = getattr(self.request, 'static_placeholders', [])
+        dirty_statics = [stpl for stpl in statics if stpl.dirty]
+        placeholders = getattr(self.request, 'placeholders', [])
+        if self.page or statics:
+            if self.toolbar.edit_mode:
+                # history menu
+                if self.page:
                     self.add_history_menu()
                     self.change_language_menu()
-                    # publish button
-                    if self.page.has_publish_permission(self.request):
-                        classes = ["cms_btn-action", "cms_btn-publish"]
-                        if self.page.is_dirty():
-                            classes.append("cms_btn-publish-active")
-                        if self.page.published:
-                            title = _("Publish Changes")
-                        else:
-                            title = _("Publish Page now")
-                        publish_url = reverse('admin:cms_page_publish_page', args=(self.page.pk,))
-                        self.toolbar.add_button(title, url=publish_url, extra_classes=classes, side=self.toolbar.RIGHT,
-                                                disabled=not self.page.is_dirty())
+                # publish button
+                publish_permission = True
+                if self.page and not self.page.has_publish_permission(self.request):
+                    publish_permission = False
+
+                for static_placeholder in dirty_statics:
+                    if not static_placeholder.has_publish_permission(self.request):
+                        publish_permission = False
+
+                classes = ["cms_btn-action", "cms_btn-publish"]
+
+                dirty = bool(self.page and self.page.is_dirty()) or len(dirty_statics) > 0
+                if dirty:
+                    classes.append("cms_btn-publish-active")
+                if dirty_statics or (self.page and self.page.published):
+                    title = _("Publish changes")
+                else:
+                    title = _("Publish page now")
+                pk = 0
+                if self.page:
+                    pk = self.page.pk
+                publish_url = reverse('admin:cms_page_publish_page', args=(pk,))
+                if dirty_statics:
+                    publish_url += "?statics=%s" % ','.join(str(static.pk) for static in dirty_statics)
+                if publish_permission:
+                    self.toolbar.add_button(title, url=publish_url, extra_classes=classes, side=self.toolbar.RIGHT,
+                                        disabled=not dirty)
+        if self.page:
+            if self.page.has_change_permission(self.request) and self.page.published:
+                self.add_draft_live()
+            elif statics:
+                for static_placeholder in statics:
+                    if static_placeholder.has_change_permission(self.request):
+                        self.add_draft_live()
+                        break
+        else:
+            added = False
+            if statics:
+                for static_placeholder in statics:
+                    if static_placeholder.has_change_permission(self.request):
+                        self.add_draft_live()
+                        added = True
+                        break
+            if not added and placeholders:
                 self.add_draft_live()
 
     def add_draft_live(self):
@@ -214,6 +273,10 @@ class PageToolbar(CMSToolbar):
                     templates_menu.add_break(TEMPLATE_MENU_BREAK)
                 templates_menu.add_ajax_item(name, action=action, data={'template': path}, active=active)
         current_page_menu.add_break(PAGE_MENU_FIRST_BREAK)
+        # dates settings
+        dates_url = reverse('admin:cms_page_dates', args=(self.page.pk,))
+        current_page_menu.add_modal_item(_('Publishing dates'), url=dates_url, close_on_url=self.toolbar.URL_CHANGE,
+                                         disabled=(not self.toolbar.edit_mode))
         # advanced settings
         advanced_url = reverse('admin:cms_page_advanced', args=(self.page.pk,))
         advanced_disabled = not self.page.has_advanced_settings_permission(self.request) or not self.toolbar.edit_mode

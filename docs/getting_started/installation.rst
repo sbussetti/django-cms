@@ -44,7 +44,7 @@ minimal additional configuration and are well-proven.
 Text Editors
 ------------
 
-* `Django CMS CKEditor`_ for a WYSIWYG editor
+* `Django CMS CKEditor`_ for a WYSIWYG editor 2.0.5 or higher
 
 .. _Django CMS CKEditor: https://github.com/divio/djangocms-text-ckeditor
 
@@ -81,6 +81,19 @@ Revision management
 ************************************
 Installing in a virtualenv using pip
 ************************************
+
+.. warning::
+
+    As django CMS 3.0 is still unreleased, you need to pick it from the github repository.
+    Use ::
+        
+        pip install https://github.com/divio/django-cms/archive/3.0.0.beta3.zip
+        
+    to install django CMS 3.0 beta3 or::
+        
+        pip install https://github.com/divio/django-cms/archive/develop.zip
+        
+    to target the development branch.
 
 Installing inside a `virtualenv`_ is the preferred way to install any Django installation. This should work on
 any platform where python in installed. The first step is to create the virtualenv:

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import with_statement
 import datetime
-from cms import constants
+from cms import constants, api
 import os.path
 
 from django.conf import settings
@@ -12,7 +12,7 @@ from django.core.urlresolvers import reverse
 from django.http import HttpRequest, HttpResponse, HttpResponseNotFound
 from django.utils import timezone
 
-from cms.admin.forms import PageForm, AdvancedSettingsForm
+from cms.admin.forms import AdvancedSettingsForm
 from cms.admin.pageadmin import PageAdmin
 from cms.api import create_page, add_plugin
 from cms.middleware.user import CurrentUserMiddleware
@@ -29,6 +29,17 @@ from cms.test_utils.util.context_managers import (LanguageOverride, SettingsOver
 from cms.utils import get_cms_setting
 from cms.utils.page_resolver import get_page_from_request, is_valid_url
 from cms.utils.page import is_valid_page_slug
+
+
+class PageMigrationTestCase(CMSTestCase):
+
+    def test_content_type(self):
+        """
+        Test correct content type is set for Page object
+        """
+        from django.contrib.contenttypes.models import ContentType
+        self.assertFalse(ContentType.objects.filter(model='page', name='', app_label='cms').exists())
+        self.assertTrue(ContentType.objects.filter(model='page', name='page', app_label='cms').exists())
 
 
 class PagesTestCase(CMSTestCase):
@@ -83,13 +94,11 @@ class PagesTestCase(CMSTestCase):
 
         }
         page = create_page(**page_data)
-
-        self.assertFalse(page.is_home(), "The page should not be marked as "
-                                         "home before being published")
+        page = page.reload()
         page.publish()
-
-        assert page.is_home()
-        assert page.publisher_public.is_home()
+        self.assertEqual(Page.objects.count(), 2)
+        self.assertTrue(page.is_home)
+        self.assertTrue(page.publisher_public.is_home)
 
         self.assertEqual(list(Title.objects.drafts().values_list('path', flat=True)), [u''])
         self.assertEqual(list(Title.objects.public().values_list('path', flat=True)), [u''])
@@ -211,6 +220,7 @@ class PagesTestCase(CMSTestCase):
         """
         Test that a page can be edited multiple times with moderator
         """
+        home = api.create_page("home", "nav_playground.html", "en")
         superuser = self.get_superuser()
         with self.login_user_context(superuser):
             page_data = self.get_new_page_data()
@@ -323,7 +333,6 @@ class PagesTestCase(CMSTestCase):
 
         self.assertEqual(Page.objects.drafts().count() - count, 3)
 
-
     def test_language_change(self):
         superuser = self.get_superuser()
         with self.login_user_context(superuser):
@@ -338,15 +347,18 @@ class PagesTestCase(CMSTestCase):
     def test_move_page(self):
         superuser = self.get_superuser()
         with self.login_user_context(superuser):
+            page_home = self.get_new_page_data()
+            self.client.post(URL_CMS_PAGE_ADD, page_home)
             page_data1 = self.get_new_page_data()
             self.client.post(URL_CMS_PAGE_ADD, page_data1)
             page_data2 = self.get_new_page_data()
             self.client.post(URL_CMS_PAGE_ADD, page_data2)
             page_data3 = self.get_new_page_data()
             self.client.post(URL_CMS_PAGE_ADD, page_data3)
-            page1 = Page.objects.all()[0]
-            page2 = Page.objects.all()[1]
-            page3 = Page.objects.all()[2]
+            home = Page.objects.all()[0]
+            page1 = Page.objects.all()[2]
+            page2 = Page.objects.all()[3]
+            page3 = Page.objects.all()[4]
 
             # move pages
             response = self.client.post("/en/admin/cms/page/%s/move-page/" % page3.pk,
@@ -368,6 +380,7 @@ class PagesTestCase(CMSTestCase):
                                  'slug'] + "/")
 
             # publish page 1 (becomes home)
+            home.delete()
             page1.publish()
             public_page1 = page1.publisher_public
             self.assertEqual(page1.get_path(), '')
@@ -390,6 +403,7 @@ class PagesTestCase(CMSTestCase):
             self.assertEqual(page1.get_path(), page_data1['slug'])
             page2 = Page.objects.get(pk=page2.pk)
             # Check that page2 is now at the root of the tree
+            self.assertTrue(page2.is_home)
             self.assertEqual(page2.get_path(), '')
             page3 = Page.objects.get(pk=page3.pk)
             self.assertEqual(page3.get_path(), page_data3['slug'])
@@ -401,7 +415,6 @@ class PagesTestCase(CMSTestCase):
         self.assertEqual(child.get_template(), parent.get_template())
         child.move_page(parent, 'left')
         self.assertEqual(child.get_template(), parent.get_template())
-
 
     def test_add_placeholder(self):
         # create page
@@ -452,11 +465,12 @@ class PagesTestCase(CMSTestCase):
         now -= datetime.timedelta(microseconds=now.microsecond)
         one_day_ago = now - datetime.timedelta(days=1)
         page = create_page("page", "nav_playground.html", "en", published=True, publication_date=now)
+        title = page.get_title_obj('en')
         page.creation_date = one_day_ago
         page.changed_date = one_day_ago
         sitemap = CMSSitemap()
-        actual_last_modification_time = sitemap.lastmod(page)
-        self.assertEqual(actual_last_modification_time, now)
+        actual_last_modification_time = sitemap.lastmod(title)
+        self.assertEqual(actual_last_modification_time.date(), now.date())
 
     def test_edit_page_other_site_and_language(self):
         """
@@ -515,6 +529,7 @@ class PagesTestCase(CMSTestCase):
         Check that plugins and placeholders get correctly deleted when we delete
         a page!
         """
+        home = create_page("home", "nav_playground.html", "en")
         page = create_page("page", "nav_playground.html", "en")
         page.rescan_placeholders() # create placeholders
         placeholder = page.placeholders.all()[0]
@@ -533,6 +548,7 @@ class PagesTestCase(CMSTestCase):
         self.assertEqual(Text.objects.count(), 1)
         self.assertTrue(Placeholder.objects.count() > 0)
         page.delete()
+        home.delete()
         self.assertEqual(CMSPlugin.objects.count(), 0)
         self.assertEqual(Text.objects.count(), 0)
         self.assertEqual(Placeholder.objects.count(), 0)
