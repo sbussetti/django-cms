@@ -178,6 +178,14 @@ In addition to model level permissions, ``Placeholder`` now checks if a user
 has permissions on a specific object of that model. Details can be found here
 in :ref:`placeholder_object_permissions`.
 
+Placeholder are prefillable with default plugins
+================================================
+
+In CMS_PLACEHOLDER_CONF, for each placeholder configuration, you can specify
+via 'default_plugins' a list of plugins to automagically add to the 
+placeholder if empty. See 
+:ref:`default_plugins in CMS_PLACEHOLDER_CONF <placeholder_default_plugins>`.
+
 Custom modules and plugin labels in the toolbar UI
 ==================================================
 
@@ -199,8 +207,8 @@ Please read :ref:`cms-copy-lang-command` before using.
 Frontedit editor for Django models
 ==================================
 
-You can now use the :ref:`show_editable_model <frontend-editable-fields>`
-template tag to edit any Django models in the frontend editor.
+Frontend editor is available for any Django model; see
+:ref:`documentation<frontend-editable-fields>` for details.
 
 New ``Page related_name`` to ``Site``
 =====================================
@@ -224,3 +232,9 @@ template tags you can just do:
 .. code-block:: html+django
 
     {% load cms_tags %}
+
+Getter and setter for translatable plugin content
+=================================================
+
+A plugin's translatable content can now be read and set through :meth:`get_translatable_content`
+and :meth:`set_translatable_content`. See :ref:`Custom Plugins <custom-plugins>` for more info.

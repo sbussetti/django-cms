@@ -188,7 +188,7 @@ def configure(db_url, **extra):
             ('col_three.html', gettext('three columns')),
             ('nav_playground.html', gettext('navigation examples')),
             ('simple.html', 'simple'),
-            ('stacks.html', 'stacks'),
+            ('static.html', 'static placeholders'),
         ),
         CMS_PLACEHOLDER_CONF={
             'col_sidebar': {
@@ -205,7 +205,7 @@ def configure(db_url, **extra):
                     'LinkPlugin': 'Different Grouper'
                 },
                 'plugin_labels': {
-                    'LinkPlugin': 'Add a link'
+                    'LinkPlugin': gettext('Add a link')
                 }
             },
 
@@ -283,6 +283,11 @@ def configure(db_url, **extra):
                     'level': 'INFO',
                 },
                 'django.request': {
+                    'handlers': ['console'],
+                    'level': 'ERROR',
+                    'propagate': False,
+                },
+                'django.db': {
                     'handlers': ['console'],
                     'level': 'ERROR',
                     'propagate': False,

@@ -442,8 +442,8 @@ class PluginsTestCase(PluginsTestBaseCase):
         self.assertEquals(CMSPlugin.objects.filter(placeholder__page__publisher_is_draft=True).count(), 1)
 
         # publish page
-        response = self.client.post(URL_CMS_PAGE + "%d/change-status/" % page.pk, {1: 1})
-        self.assertEqual(response.status_code, 200)
+        response = self.client.post(URL_CMS_PAGE + "%d/en/publish/" % page.pk, {1: 1})
+        self.assertEqual(response.status_code, 302)
         self.assertEquals(Page.objects.count(), 3)
 
         # there should now be two plugins - 1 draft, 1 public
@@ -548,7 +548,7 @@ class PluginsTestCase(PluginsTestBaseCase):
             city="Zurich",
         )
         plugin.insert_at(None, position='last-child', save=True)
-        inheritfrompage.publish()
+        inheritfrompage.publish('en')
 
         page = create_page('inherit from page',
                            'nav_playground.html',
@@ -565,7 +565,7 @@ class PluginsTestCase(PluginsTestBaseCase):
             from_page=inheritfrompage,
             from_language=settings.LANGUAGE_CODE)
         inherit_plugin.insert_at(None, position='last-child', save=True)
-        page.publish()
+        page.publish('en')
 
         self.client.logout()
         response = self.client.get(page.get_absolute_url())
@@ -714,7 +714,7 @@ class PluginsTestCase(PluginsTestBaseCase):
         placeholder = page.placeholders.get(slot='body')
         text = Text(body="hello", language="en", placeholder=placeholder, plugin_type="TextPlugin", position=1)
         text.save()
-        page.publish()
+        page.publish('en')
         pages = Page.objects.search("hi")
         self.assertEqual(pages.count(), 0)
         self.assertEqual(Page.objects.search("hello").count(),1)
@@ -739,7 +739,7 @@ class PluginsTestCase(PluginsTestBaseCase):
     def test_editing_plugin_changes_page_modification_time_in_sitemap(self):
         now = timezone.now()
         one_day_ago = now - datetime.timedelta(days=1)
-        page = create_page("page", "nav_playground.html", "en", published=True, publication_date=now)
+        page = create_page("page", "nav_playground.html", "en", published=True)
         title = page.get_title_obj('en')
         page.creation_date = one_day_ago
         page.changed_date = one_day_ago
@@ -1016,6 +1016,32 @@ class PluginsTestCase(PluginsTestBaseCase):
                                 plugin.get_parent_classes(placeholder.slot, page))
         plugin_pool.unregister_plugin(ParentClassesPlugin)
 
+    def test_plugin_translatable_content_getter_setter(self):
+        """
+        Test that you can add a text plugin
+        """
+        # add a new text plugin
+        page_data = self.get_new_page_data()
+        response = self.client.post(URL_CMS_PAGE_ADD, page_data)
+        page = Page.objects.all()[0]
+        created_plugin_id = self._create_text_plugin_on_page(page)
+
+        # now edit the plugin
+        plugin = self._edit_text_plugin(created_plugin_id, "Hello World")
+        self.assertEquals("Hello World", plugin.body)
+
+        # see if the getter works
+        self.assertEquals({'body': "Hello World"}, plugin.get_translatable_content())
+
+        # change the content
+        self.assertEquals(True, plugin.set_translatable_content({'body': "It works!"}))
+
+        # check if it changed
+        self.assertEquals("It works!", plugin.body)
+
+        # double check through the getter
+        self.assertEquals({'body': "It works!"}, plugin.get_translatable_content())
+
 
 class FileSystemPluginTests(PluginsTestBaseCase):
     def setUp(self):
@@ -1173,7 +1199,7 @@ class PluginManyToManyTestCase(PluginsTestBaseCase):
 
 
         # check publish box
-        page = publish_page(page, self.super_user)
+        page = publish_page(page, self.super_user, 'en')
 
         # there should now be two plugins - 1 draft, 1 public
         self.assertEquals(2, CMSPlugin.objects.all().count())

@@ -25,7 +25,7 @@ from cms.test_utils.testcases import CMSTestCase
 from cms.test_utils.util.context_managers import (SettingsOverride, UserLoginContext)
 from cms.test_utils.util.mock import AttributeObject
 from cms.utils.compat.dj import force_unicode
-from cms.utils.placeholder import PlaceholderNoAction, MLNGPlaceholderActions
+from cms.utils.placeholder import PlaceholderNoAction, MLNGPlaceholderActions, get_placeholder_conf
 from cms.utils.plugins import get_placeholders
 from django.conf import settings
 from django.contrib import admin
@@ -232,6 +232,46 @@ class PlaceholderTestCase(CMSTestCase, UnittestCompatMixin):
         rctx['language'] = 'de'
         self.assertEqual(template.render(rctx).strip(), "Deutsch")
 
+    def test_get_placeholder_conf(self):
+        TEST_CONF = {
+            'main': {
+                'name': 'main content',
+                'plugins': ['TextPlugin', 'LinkPlugin'],
+                'default_plugins':[
+                    {
+                        'plugin_type':'TextPlugin', 
+                        'values':{
+                            'body':'<p>Some default text</p>'
+                        },
+                    },
+                ],
+            },
+            'layout/home.html main': {
+                'name': u'main content with FilerImagePlugin and limit',
+                'plugins': ['TextPlugin', 'FilerImagePlugin', 'LinkPlugin',],
+                'inherit':'main',
+                'limits': {'global': 1,},
+            },
+            'layout/other.html main': {
+                'name': u'main content with FilerImagePlugin and no limit',
+                'inherit':'layout/home.html main',
+                'limits': {},
+            },
+        }
+        with SettingsOverride(CMS_PLACEHOLDER_CONF=TEST_CONF):
+            #test no inheritance
+            returned = get_placeholder_conf('plugins', 'main')
+            self.assertEqual(returned, TEST_CONF['main']['plugins'])
+            #test no inherited value with inheritance enabled
+            returned = get_placeholder_conf('plugins', 'main', 'layout/home.html')
+            self.assertEqual(returned, TEST_CONF['layout/home.html main']['plugins'])
+            #test direct inherited value
+            returned = get_placeholder_conf('plugins', 'main', 'layout/other.html')
+            self.assertEqual(returned, TEST_CONF['layout/home.html main']['plugins'])
+            #test grandparent inherited value
+            returned = get_placeholder_conf('default_plugins', 'main', 'layout/other.html')
+            self.assertEqual(returned, TEST_CONF['main']['default_plugins'])
+
     def test_placeholder_context_leaking(self):
         TEST_CONF = {'test': {'extra_context': {'width': 10}}}
         ph = Placeholder.objects.create(slot='test')
@@ -390,6 +430,37 @@ class PlaceholderTestCase(CMSTestCase, UnittestCompatMixin):
             content_en = render_placeholder(placeholder_en, context_en)
             self.assertRegexpMatches(content_en, "^en body$")
 
+    def test_plugins_prepopulate(self):
+        """ Tests prepopulate placeholder configuration """
+
+        class NoPushPopContext(Context):
+            def push(self):
+                pass
+
+            pop = push
+        conf = {
+            'col_left': {
+                'default_plugins' : [
+                    {
+                        'plugin_type':'TextPlugin', 
+                        'values':{'body':'<p>en default body 1</p>'}, 
+                    },
+                    {
+                        'plugin_type':'TextPlugin', 
+                        'values':{'body':'<p>en default body 2</p>'}, 
+                    },
+                ]
+            },
+        }
+        with SettingsOverride(CMS_PLACEHOLDER_CONF=conf):
+            page = create_page('page_en', 'col_two.html', 'en')
+            placeholder = page.placeholders.get(slot='col_left')
+            context = NoPushPopContext()
+            context['request'] = self.get_request(language="en", page=page)
+            # Our page should have "en default body 1" AND "en default body 2"
+            content = render_placeholder(placeholder, context)
+            self.assertRegexpMatches(content, "^<p>en default body 1</p>\s*<p>en default body 2</p>$")
+
     def test_placeholder_pk_thousands_format(self):
         page = create_page("page", "nav_playground.html", "en", published=True)
         for placeholder in page.placeholders.all():
@@ -419,6 +490,54 @@ class PlaceholderTestCase(CMSTestCase, UnittestCompatMixin):
                     response, "'clipboard': '%s'" % format(
                         response.context['request'].toolbar.clipboard.pk, ".",
                         grouping=3, thousand_sep=","))
+
+    def test_placeholder_languages_model(self):
+        """
+        Checks the retrieval of filled languages for a placeholder in a django
+        model
+        """
+        avail_langs = set([u'en', u'de', u'fr'])
+        # Setup instance
+        ex = Example1(
+            char_1='one',
+            char_2='two',
+            char_3='tree',
+            char_4='four'
+        )
+        ex.save()
+        ###
+        # add the test plugin
+        ###
+        for lang in avail_langs:
+            test_plugin = add_plugin(ex.placeholder, u"EmptyPlugin", lang)
+        # reload instance from database
+        ex = Example1.objects.get(pk=ex.pk)
+        #get languages
+        langs = [lang['code'] for lang in ex.placeholder.get_filled_languages()]
+        self.assertEqual(avail_langs, set(langs))
+
+    def test_placeholder_languages_page(self):
+        """
+        Checks the retrieval of filled languages for a placeholder in a django
+        model
+        """
+        avail_langs = set([u'en', u'de', u'fr'])
+        # Setup instances
+        page = create_page('test page', 'col_two.html', u'en')
+        for lang in avail_langs:
+            if lang != u'en':
+                create_title(lang, 'test page %s' % lang, page)
+        placeholder = page.placeholders.get(slot='col_sidebar')
+        ###
+        # add the test plugin
+        ###
+        for lang in avail_langs:
+            test_plugin = add_plugin(placeholder, u"EmptyPlugin", lang)
+        # reload placeholder from database
+        placeholder = page.placeholders.get(slot='col_sidebar')
+        # get languages
+        langs = [lang['code'] for lang in placeholder.get_filled_languages()]
+        self.assertEqual(avail_langs, set(langs))
 
 
 class PlaceholderActionTests(FakemlngFixtures, CMSTestCase):
