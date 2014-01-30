@@ -7,11 +7,12 @@ from cms.models import StaticPlaceholder, Placeholder, CMSPlugin
 from cms.stacks.models import Stack
 from cms.tests.plugins import PluginsTestBaseCase
 from cms.utils.compat.dj import force_unicode
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.contrib.admin.sites import site
 from django.template.base import Template
 
 
+User = get_user_model()
 URL_CMS_MOVE_PLUGIN = u'/en/admin/cms/page/%d/move-plugin/'
 
 

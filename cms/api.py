@@ -13,7 +13,7 @@ from cms.utils.conf import get_cms_setting
 from django.core.exceptions import PermissionDenied, ValidationError
 from cms.utils.i18n import get_language_list
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.contrib.sites.models import Site
 from django.db.models import Max
 from django.template.defaultfilters import slugify
@@ -32,8 +32,11 @@ from cms.plugin_pool import plugin_pool
 from cms.utils.permissions import _thread_locals
 
 
+User = get_user_model()
+
+
 #===============================================================================
-# Constants 
+# Constants
 #===============================================================================
 
 VISIBILITY_ALL = None
@@ -105,7 +108,7 @@ def _verify_plugin_type(plugin_type):
     return plugin_model, plugin_type
 
 #===============================================================================
-# Public API 
+# Public API
 #===============================================================================
 
 def create_page(title, template, language, menu_title=None, slug=None,
@@ -118,7 +121,7 @@ def create_page(title, template, language, menu_title=None, slug=None,
                 position="last-child", overwrite_url=None):
     """
     Create a CMS Page and it's title for the given language
-    
+
     See docs/extending_cms/api_reference.rst for more info
     """
     # ugly permissions hack
@@ -217,9 +220,9 @@ def create_title(language, title, page, menu_title=None, slug=None,
                  parent=None, overwrite_url=None):
     """
     Create a title.
-    
+
     Parent is only used if slug=None.
-    
+
     See docs/extending_cms/api_reference.rst for more info
     """
     # validate page
@@ -254,7 +257,7 @@ def add_plugin(placeholder, plugin_type, language, position='last-child',
                target=None, **data):
     """
     Add a plugin to a placeholder
-    
+
     See docs/extending_cms/api_reference.rst for more info
     """
     # validate placeholder
@@ -290,7 +293,7 @@ def create_page_user(created_by, user,
                      can_delete_pagepermission=True, grant_all=False):
     """
     Creates a page user.
-    
+
     See docs/extending_cms/api_reference.rst for more info
     """
     if grant_all:
@@ -333,7 +336,7 @@ def assign_user_to_page(page, user, grant_on=ACCESS_PAGE_AND_DESCENDANTS,
                         grant_all=False, global_permission=False):
     """
     Assigns given user to page, and gives him requested permissions.
-    
+
     See docs/extending_cms/api_reference.rst for more info
     """
     grant_all = grant_all and not global_permission
@@ -363,7 +366,7 @@ def publish_page(page, user, language):
     """
     Publish a page. This sets `page.published` to `True` and calls publish()
     which does the actual publishing.
-    
+
     See docs/extending_cms/api_reference.rst for more info
     """
     page = page.reload()

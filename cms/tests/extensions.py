@@ -5,10 +5,13 @@ from cms.test_utils.testcases import SettingsOverrideTestCase as TestCase
 
 from cms.extensions import *
 from cms.tests import AdminTestsBase
-from django.contrib.auth.models import Permission, User
+from django.contrib.auth.models import Permission
+from django.contrib.auth import get_user_model
 from django.contrib.sites.models import Site
 from django.core.urlresolvers import reverse
 
+
+User = get_user_model()
 
 class ExtensionsTestCase(TestCase):
     def test_register_extension(self):

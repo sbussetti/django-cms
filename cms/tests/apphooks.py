@@ -11,7 +11,7 @@ from cms.test_utils.util.context_managers import SettingsOverride
 from cms.tests.menu_utils import DumbPageLanguageUrl
 from cms.utils.compat.type_checks import string_types
 from cms.utils.i18n import force_language
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.core.urlresolvers import clear_url_caches, reverse
 
 
@@ -19,6 +19,7 @@ APP_NAME = 'SampleApp'
 NS_APP_NAME = 'NamespacedApp'
 APP_MODULE = "cms.test_utils.project.sampleapp.cms_app"
 
+User = get_user_model()
 
 class ApphooksTestCase(CMSTestCase):
     def setUp(self):

@@ -2,7 +2,8 @@
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group
+from django.contrib.auth import get_user_model
 from django.contrib.sites.models import Site
 
 from cms.models import Page
@@ -10,6 +11,8 @@ from cms.models.managers import BasicPagePermissionManager, PagePermissionManage
 from cms.utils.helpers import reversion_register
 from cms.utils.compat.dj import force_unicode, python_2_unicode_compatible
 
+
+User = get_user_model()
 
 # NOTE: those are not just numbers!! we will do binary AND on them,
 # so pay attention when adding/changing them, or MASKs..

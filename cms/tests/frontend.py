@@ -2,7 +2,7 @@
 from cms.api import create_page
 from cms.models import Page
 from cms.test_utils.util.context_managers import SettingsOverride
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.contrib.sites.models import Site
 from django.db import connections
 from django.utils import unittest
@@ -11,6 +11,7 @@ from selenium.common.exceptions import NoSuchElementException, NoAlertPresentExc
 from django.test import LiveServerTestCase, TestCase
 import os
 
+User = get_user_model()
 
 class CMSLiveTests(LiveServerTestCase, TestCase):
     @classmethod

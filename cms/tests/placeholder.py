@@ -29,7 +29,8 @@ from cms.utils.placeholder import PlaceholderNoAction, MLNGPlaceholderActions, g
 from cms.utils.plugins import get_placeholders
 from django.conf import settings
 from django.contrib import admin
-from django.contrib.auth.models import User, Permission
+from django.contrib.auth.models import Permission
+from django.contrib.auth import get_user_model
 from cms.test_utils.project.objectpermissionsapp.models import UserObjectPermission
 from django.contrib.messages.storage import default_storage
 from django.core.exceptions import ImproperlyConfigured
@@ -41,6 +42,8 @@ from django.template.context import Context, RequestContext
 from django.test import TestCase
 import itertools
 
+
+User = get_user_model()
 
 class PlaceholderTestCase(CMSTestCase, UnittestCompatMixin):
     def setUp(self):
@@ -239,7 +242,7 @@ class PlaceholderTestCase(CMSTestCase, UnittestCompatMixin):
                 'plugins': ['TextPlugin', 'LinkPlugin'],
                 'default_plugins':[
                     {
-                        'plugin_type':'TextPlugin', 
+                        'plugin_type':'TextPlugin',
                         'values':{
                             'body':'<p>Some default text</p>'
                         },
@@ -442,12 +445,12 @@ class PlaceholderTestCase(CMSTestCase, UnittestCompatMixin):
             'col_left': {
                 'default_plugins' : [
                     {
-                        'plugin_type':'TextPlugin', 
-                        'values':{'body':'<p>en default body 1</p>'}, 
+                        'plugin_type':'TextPlugin',
+                        'values':{'body':'<p>en default body 1</p>'},
                     },
                     {
-                        'plugin_type':'TextPlugin', 
-                        'values':{'body':'<p>en default body 2</p>'}, 
+                        'plugin_type':'TextPlugin',
+                        'values':{'body':'<p>en default body 2</p>'},
                     },
                 ]
             },

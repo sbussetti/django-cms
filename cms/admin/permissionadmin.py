@@ -8,11 +8,12 @@ from cms.utils.conf import get_cms_setting
 from cms.utils.helpers import classproperty
 from cms.utils.permissions import get_user_permission_level
 from django.contrib import admin
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.utils.translation import ugettext as _
 
 
 PERMISSION_ADMIN_INLINES = []
+User = get_user_model()
 
 
 class TabularInline(admin.TabularInline):
@@ -38,7 +39,7 @@ class PagePermissionInlineAdmin(TabularInline):
     def queryset(self, request):
         """
         Queryset change, so user with global change permissions can see
-        all permissions. Otherwise can user see only permissions for 
+        all permissions. Otherwise can user see only permissions for
         peoples which are under him (he can't see his permissions, because
         this will lead to violation, when he can add more power to itself)
         """

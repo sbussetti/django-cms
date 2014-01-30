@@ -3,13 +3,14 @@ from cms.utils import get_cms_setting
 from django.conf import settings
 from django.core.cache import cache
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 
 PERMISSION_KEYS = [
     'can_change', 'can_add', 'can_delete',
     'can_change_advanced_settings', 'can_publish',
     'can_change_permissions', 'can_move_page',
     'can_moderate', 'can_view']
+User = get_user_model()
 
 
 def get_cache_key(user, key):

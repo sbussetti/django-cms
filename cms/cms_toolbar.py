@@ -14,9 +14,11 @@ from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.utils.translation import ugettext_lazy as _
 from django.contrib import admin
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from menus.utils import DefaultLanguageChanger
 
+
+User = get_user_model()
 
 # Identifiers for search
 ADMIN_MENU_IDENTIFIER = 'admin-menu'

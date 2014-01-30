@@ -16,7 +16,7 @@ from cms import __version__
 from cms.test_utils.cli import configure
 from cms.test_utils.tmpdir import temp_dir
 
-__doc__ = '''django CMS development helper script. 
+__doc__ = '''django CMS development helper script.
 
 To use a different database, set the DATABASE_URL environment variable to a
 dj-database-url compatible value.
@@ -50,7 +50,8 @@ def server(bind='127.0.0.1', port=8000, migrate=False):
         else:
             syncdb.Command().handle_noargs(interactive=False, verbosity=1, database='default', migrate=False, migrate_all=True)
             migrate.Command().handle(interactive=False, verbosity=1, fake=True)
-        from django.contrib.auth.models import User
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
         if not User.objects.filter(is_superuser=True).exists():
             usr = User()
             usr.username = 'admin'
