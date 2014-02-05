@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 from __future__ import with_statement
 import json
-from cms.api import add_plugin
+from cms.api import add_plugin, create_page
 from cms.constants import PLUGIN_MOVE_ACTION
 from cms.models import StaticPlaceholder, Placeholder, CMSPlugin
-from cms.stacks.models import Stack
 from cms.tests.plugins import PluginsTestBaseCase
 from cms.utils.compat.dj import force_unicode
 from django.contrib.auth.models import User
 from django.contrib.admin.sites import site
 from django.template.base import Template
+from djangocms_text_ckeditor.cms_plugins import TextPlugin
 
 
 URL_CMS_MOVE_PLUGIN = u'/en/admin/cms/page/%d/move-plugin/'
@@ -52,7 +52,7 @@ class StaticPlaceholderTestCase(PluginsTestBaseCase):
         return usr
 
     def test_template_creation(self):
-        self.assertObjectDoesNotExist(Stack.objects.all(), code='foobar')
+        self.assertObjectDoesNotExist(StaticPlaceholder.objects.all(), code='foobar')
         self.assertObjectDoesNotExist(Placeholder.objects.all(), slot='foobar')
         t = Template('{% load cms_tags %}{% static_placeholder "foobar" %}')
         t.render(self.get_context('/'))
@@ -60,7 +60,7 @@ class StaticPlaceholderTestCase(PluginsTestBaseCase):
         self.assertEqual(Placeholder.objects.filter(slot='foobar').count(), 2)
 
     def test_empty(self):
-        self.assertObjectDoesNotExist(Stack.objects.all(), code='foobar')
+        self.assertObjectDoesNotExist(StaticPlaceholder.objects.all(), code='foobar')
         self.assertObjectDoesNotExist(Placeholder.objects.all(), slot='foobar')
         t = Template('{% load cms_tags %}{% static_placeholder "foobar" or %}No Content{% endstatic_placeholder %}')
         rendered = t.render(self.get_context('/'))
@@ -142,3 +142,4 @@ class StaticPlaceholderTestCase(PluginsTestBaseCase):
             target = StaticPlaceholder.objects.get(pk=static_placeholder_target.pk)
             self.assertFalse(source.dirty)
             self.assertTrue(target.dirty)
+

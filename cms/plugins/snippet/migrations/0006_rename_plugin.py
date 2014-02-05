@@ -1,32 +1,17 @@
 # -*- coding: utf-8 -*-
-import datetime
-from cms.models import StaticPlaceholder
+from south.utils import datetime_utils as datetime
 from south.db import db
-from south.v2 import DataMigration
+from south.v2 import SchemaMigration
 from django.db import models
 
-class Migration(DataMigration):
 
-    depends_on = (
-        ("cms", "0052_auto__add_placeholderreference__add_staticplaceholder__add_field_page_"),
-    )
+class Migration(SchemaMigration):
 
     def forwards(self, orm):
-        for stack in orm['stacks.Stack'].objects.all():
-            try:
-                sp = StaticPlaceholder.objects.get(code=stack.code)
-            except StaticPlaceholder.DoesNotExist:
-                sp = StaticPlaceholder()
-            sp.code = stack.code
-            sp.is_dirty = True
-            sp.draft_id = stack.draft_id
-            sp.public_id = stack.public_id
-            sp.name = stack.name
-            sp.creation_method = stack.creation_method
-            sp.save()
+        db.rename_table('cmsplugin_snippetptr', 'snippet_snippetptr')
 
     def backwards(self, orm):
-        "Write your backwards methods here."
+        db.rename_table('snippet_snippetptr', 'cmsplugin_snippetptr')
 
     models = {
         'cms.cmsplugin': {
@@ -50,22 +35,18 @@ class Migration(DataMigration):
             u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'slot': ('django.db.models.fields.CharField', [], {'max_length': '50', 'db_index': 'True'})
         },
-        u'stacks.stack': {
-            'Meta': {'object_name': 'Stack'},
-            'code': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '255', 'blank': 'True'}),
-            'creation_method': ('django.db.models.fields.CharField', [], {'default': "'code'", 'max_length': '20', 'blank': 'True'}),
-            'dirty': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
-            'draft': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'stacks_draft'", 'null': 'True', 'to': "orm['cms.Placeholder']"}),
+        u'snippet.snippet': {
+            'Meta': {'ordering': "['name']", 'object_name': 'Snippet'},
+            'html': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
             u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'name': ('django.db.models.fields.CharField', [], {'default': "''", 'max_length': '255', 'blank': 'True'}),
-            'public': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'stacks_public'", 'null': 'True', 'to': "orm['cms.Placeholder']"})
+            'name': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '255'}),
+            'template': ('django.db.models.fields.CharField', [], {'max_length': '50', 'blank': 'True'})
         },
-        u'stacks.stacklink': {
-            'Meta': {'object_name': 'StackLink', 'db_table': "u'cmsplugin_stacklink'", '_ormbases': ['cms.CMSPlugin']},
+        u'snippet.snippetptr': {
+            'Meta': {'object_name': 'SnippetPtr', 'db_table': "u'cmsplugin_snippetptr'", '_ormbases': ['cms.CMSPlugin']},
             u'cmsplugin_ptr': ('django.db.models.fields.related.OneToOneField', [], {'to': "orm['cms.CMSPlugin']", 'unique': 'True', 'primary_key': 'True'}),
-            'stack': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'linked_plugins'", 'to': u"orm['stacks.Stack']"})
+            'snippet': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['snippet.Snippet']"})
         }
     }
 
-    complete_apps = ['stacks']
-    symmetrical = True
+    complete_apps = ['snippet']

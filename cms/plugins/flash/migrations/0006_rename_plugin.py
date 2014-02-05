@@ -1,25 +1,17 @@
 # -*- coding: utf-8 -*-
-import datetime
-from cms.models import Placeholder
+from south.utils import datetime_utils as datetime
 from south.db import db
-from south.v2 import DataMigration
+from south.v2 import SchemaMigration
 from django.db import models
 
-class Migration(DataMigration):
+
+class Migration(SchemaMigration):
 
     def forwards(self, orm):
-        "Write your forwards methods here."
-        # Note: Don't use "from appname.models import ModelName". 
-        # Use orm.ModelName to refer to models in this application,
-        # and orm['appname.ModelName'] for models in other applications.
-        for stack in orm['stacks.Stack'].objects.all():
-            ph = Placeholder()
-            ph.save()
-            stack.public_id = ph.pk
-            stack.save()
+        db.rename_table('cmsplugin_flash', 'flash_flash')
 
     def backwards(self, orm):
-        "Write your backwards methods here."
+        db.rename_table('flash_flash', 'cmsplugin_flash')
 
     models = {
         'cms.cmsplugin': {
@@ -43,22 +35,13 @@ class Migration(DataMigration):
             u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'slot': ('django.db.models.fields.CharField', [], {'max_length': '50', 'db_index': 'True'})
         },
-        u'stacks.stack': {
-            'Meta': {'object_name': 'Stack'},
-            'code': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '255', 'blank': 'True'}),
-            'creation_method': ('django.db.models.fields.CharField', [], {'default': "'code'", 'max_length': '20', 'blank': 'True'}),
-            'dirty': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
-            'draft': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'stacks_draft'", 'null': 'True', 'to': "orm['cms.Placeholder']"}),
-            u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'name': ('django.db.models.fields.CharField', [], {'default': "''", 'max_length': '255', 'blank': 'True'}),
-            'public': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'stacks_public'", 'null': 'True', 'to': "orm['cms.Placeholder']"})
-        },
-        u'stacks.stacklink': {
-            'Meta': {'object_name': 'StackLink', 'db_table': "u'cmsplugin_stacklink'", '_ormbases': ['cms.CMSPlugin']},
+        u'flash.flash': {
+            'Meta': {'object_name': 'Flash', 'db_table': "u'cmsplugin_flash'", '_ormbases': ['cms.CMSPlugin']},
             u'cmsplugin_ptr': ('django.db.models.fields.related.OneToOneField', [], {'to': "orm['cms.CMSPlugin']", 'unique': 'True', 'primary_key': 'True'}),
-            'stack': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'linked_plugins'", 'to': u"orm['stacks.Stack']"})
+            'file': ('django.db.models.fields.files.FileField', [], {'max_length': '100'}),
+            'height': ('django.db.models.fields.CharField', [], {'max_length': '6'}),
+            'width': ('django.db.models.fields.CharField', [], {'max_length': '6'})
         }
     }
 
-    complete_apps = ['stacks']
-    symmetrical = True
+    complete_apps = ['flash']

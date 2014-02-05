@@ -7,7 +7,7 @@ from django.utils.translation import ugettext as _
 from cms.exceptions import PluginLimitReached
 from cms.plugin_pool import plugin_pool
 from cms.utils import get_language_from_request, permissions
-from cms.utils.i18n import get_redirect_on_fallback, get_fallback_languages
+from cms.utils.i18n import get_fallback_languages
 from cms.utils.moderator import get_cmsplugin_queryset
 from cms.utils.placeholder import get_placeholder_conf
 from cms.utils.compat.dj import force_unicode
@@ -82,6 +82,7 @@ def create_default_plugins(request, placeholders, template, lang):
     """
     Create all default plugins for the given ``placeholders`` if they have 
     a "default_plugins" configuration value in settings.
+    return all plugins, children, grandchildren (etc.) created
     """
     from cms.api import add_plugin
     plugins = list()
@@ -96,7 +97,34 @@ def create_default_plugins(request, placeholders, template, lang):
                 continue
             plugin = add_plugin(placeholder, conf['plugin_type'], lang, **conf['values'])
             plugins.append(plugin)
+            if 'children' in conf:
+                children = create_default_children_plugins(request, placeholder, lang, plugin, conf['children'])
+                plugins+=children
+            plugin.notify_on_autoadd(request, conf)
     return plugins
+
+
+def create_default_children_plugins(request, placeholder, lang, parent_plugin, children_conf):
+    """
+    Create all default children plugins in the given ``placeholder``.
+    If a child have children, this function recurse.
+    Return all children and grandchildren (etc.) created
+    """
+    from cms.api import add_plugin
+    children = list()
+    grandchildren = list()
+    for conf in children_conf:
+        if not permissions.has_plugin_permission(request.user, conf['plugin_type'], "add"):
+            continue
+        plugin = add_plugin(placeholder, conf['plugin_type'], lang, **conf['values'])
+        plugin.parent = parent_plugin
+        plugin.save()
+        if 'children' in conf:
+            grandchildren+= create_default_children_plugins(request, placeholder, lang, plugin, conf['children'])
+        plugin.notify_on_autoadd(request, conf)
+        children.append(plugin)
+    parent_plugin.notify_on_autoadd_children(request, conf, children)
+    return children + grandchildren
 
 
 def build_plugin_tree(plugin_list):

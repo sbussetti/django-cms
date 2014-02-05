@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from copy import deepcopy, copy
+from copy import copy
 from itertools import chain
 from datetime import datetime
 from django.template.defaultfilters import safe
@@ -285,6 +285,8 @@ class RenderPlugin(InclusionTag):
     def get_context(self, context, plugin):
         # Prepend frontedit toolbar output if applicable
         edit = False
+        if not plugin:
+            return {'content': ''}
         request = context['request']
         toolbar = getattr(request, 'toolbar', None)
         page = request.current_page

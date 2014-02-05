@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import datetime
+from south.utils import datetime_utils as datetime
 from south.db import db
 from south.v2 import SchemaMigration
 from django.db import models
@@ -8,29 +8,10 @@ from django.db import models
 class Migration(SchemaMigration):
 
     def forwards(self, orm):
-        # Deleting field 'Stack.content'
-        db.rename_column('stacks_stack', 'content_id', 'draft_id')
-
-        # Adding field 'Stack.public'
-        db.add_column(u'stacks_stack', 'public',
-                      self.gf('django.db.models.fields.related.ForeignKey')(related_name='stacks_public', null=True, to=orm['cms.Placeholder']),
-                      keep_default=False)
-
-        # Adding field 'Stack.dirty'
-        db.add_column(u'stacks_stack', 'dirty',
-                      self.gf('django.db.models.fields.BooleanField')(default=False),
-                      keep_default=False)
+        db.rename_table('cmsplugin_video', 'video_video')
 
     def backwards(self, orm):
-
-        db.rename_column('stacks_stack', 'draft_id', 'content_id')        # Adding field 'Stack.content'
-
-        # Deleting field 'Stack.public'
-        db.delete_column(u'stacks_stack', 'public_id')
-
-        # Deleting field 'Stack.dirty'
-        db.delete_column(u'stacks_stack', 'dirty')
-
+        db.rename_table('video_video', 'cmsplugin_video')
 
     models = {
         'cms.cmsplugin': {
@@ -54,21 +35,27 @@ class Migration(SchemaMigration):
             u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'slot': ('django.db.models.fields.CharField', [], {'max_length': '50', 'db_index': 'True'})
         },
-        u'stacks.stack': {
-            'Meta': {'object_name': 'Stack'},
-            'code': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '255', 'blank': 'True'}),
-            'creation_method': ('django.db.models.fields.CharField', [], {'default': "'code'", 'max_length': '20', 'blank': 'True'}),
-            'dirty': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
-            'draft': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'stacks_draft'", 'null': 'True', 'to': "orm['cms.Placeholder']"}),
-            u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'name': ('django.db.models.fields.CharField', [], {'default': "''", 'max_length': '255', 'blank': 'True'}),
-            'public': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'stacks_public'", 'null': 'True', 'to': "orm['cms.Placeholder']"})
-        },
-        u'stacks.stacklink': {
-            'Meta': {'object_name': 'StackLink', 'db_table': "u'cmsplugin_stacklink'", '_ormbases': ['cms.CMSPlugin']},
+        u'video.video': {
+            'Meta': {'object_name': 'Video', 'db_table': "u'cmsplugin_video'", '_ormbases': ['cms.CMSPlugin']},
+            'auto_hide': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
+            'auto_play': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
+            'bgcolor': ('django.db.models.fields.CharField', [], {'default': "'000000'", 'max_length': '6'}),
+            'buttonhighlightcolor': ('django.db.models.fields.CharField', [], {'default': "'FFFFFF'", 'max_length': '6'}),
+            'buttonoutcolor': ('django.db.models.fields.CharField', [], {'default': "'333333'", 'max_length': '6'}),
+            'buttonovercolor': ('django.db.models.fields.CharField', [], {'default': "'000000'", 'max_length': '6'}),
             u'cmsplugin_ptr': ('django.db.models.fields.related.OneToOneField', [], {'to': "orm['cms.CMSPlugin']", 'unique': 'True', 'primary_key': 'True'}),
-            'stack': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'linked_plugins'", 'to': u"orm['stacks.Stack']"})
+            'fullscreen': ('django.db.models.fields.BooleanField', [], {'default': 'True'}),
+            'height': ('django.db.models.fields.PositiveSmallIntegerField', [], {}),
+            'image': ('django.db.models.fields.files.ImageField', [], {'max_length': '100', 'null': 'True', 'blank': 'True'}),
+            'loadingbarcolor': ('django.db.models.fields.CharField', [], {'default': "'828282'", 'max_length': '6'}),
+            'loop': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
+            'movie': ('django.db.models.fields.files.FileField', [], {'max_length': '100', 'null': 'True', 'blank': 'True'}),
+            'movie_url': ('django.db.models.fields.CharField', [], {'max_length': '255', 'null': 'True', 'blank': 'True'}),
+            'seekbarbgcolor': ('django.db.models.fields.CharField', [], {'default': "'333333'", 'max_length': '6'}),
+            'seekbarcolor': ('django.db.models.fields.CharField', [], {'default': "'13ABEC'", 'max_length': '6'}),
+            'textcolor': ('django.db.models.fields.CharField', [], {'default': "'FFFFFF'", 'max_length': '6'}),
+            'width': ('django.db.models.fields.PositiveSmallIntegerField', [], {})
         }
     }
 
-    complete_apps = ['stacks']
+    complete_apps = ['video']
